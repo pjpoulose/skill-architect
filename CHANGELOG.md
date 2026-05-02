@@ -6,6 +6,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Thi
 
 ---
 
+## [0.1.1] — 2026-05-02
+
+### Changed
+- `tools/validate.py` — `failure_mode_diversity_check` now scans both `failure_id` (snake_case identifier) and `trigger_condition` (natural-language sentence) when classifying failure modes as input-side / runtime-side / output-side. Previously only `trigger_condition` was scanned, which caused output-side detection to false-negative when output-side concepts appeared in the failure_id but not the trigger_condition (e.g. `no_action_items_found` failed detection).
+- Output-side keyword set broadened to catch common patterns: `no_*`, `_found`, `_mismatch`, `_drift`, `incomplete`, `low_confidence`, `no_match`, `no_findings`, etc.
+- Input-side and runtime-side keyword sets also broadened with additional snake_case variants (`too_long`, `out_of_range`, `wrong_format`, `rate_limit`, `_unavailable`, etc.).
+
+### Fixed
+- v0.1.0 fixture `specs/example-extract-action-items.yaml` now passes without the spurious "may be missing an output-side failure" informational note.
+
+### Notes
+- Heuristic remains informational — flags are notes, not failures. Validator still exits 0 with notes.
+- No schema changes. v0.1.0 specs continue to pass without modification.
+
+[0.1.1]: https://github.com/pjpoulose/skill-architect/releases/tag/v0.1.1
+
+---
+
 ## [0.1.0] — 2026-05-02
 
 ### Added

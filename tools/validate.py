@@ -150,16 +150,38 @@ def class_tier_consistency_check(spec: dict[str, Any]) -> list[str]:
 def failure_mode_diversity_check(spec: dict[str, Any]) -> list[str]:
     """Encourage at least one input-side, one context/runtime-side, one output-side failure mode.
 
-    Heuristic: keyword scan over trigger_condition. Not authoritative — informational only.
+    Heuristic: keyword scan over BOTH failure_id (snake_case identifier) and trigger_condition
+    (natural-language sentence). Combined scanning improves detection of output-side failures
+    that often appear in failure_id (e.g. "no_action_items_found") but not always in
+    trigger_condition. Not authoritative — informational only.
     """
     modes = spec.get("failure_modes", []) or []
     if len(modes) < 3:
         return []  # schema check already flagged this
 
-    text = " ".join(m.get("trigger_condition", "").lower() for m in modes)
-    has_input_side = any(k in text for k in ("input", "missing", "invalid", "exceeds", "too long", "empty"))
-    has_runtime_side = any(k in text for k in ("connection", "api", "context", "memory", "unavailable", "permission"))
-    has_output_side = any(k in text for k in ("output", "fabricat", "no result", "ambiguous", "no action", "not found"))
+    parts: list[str] = []
+    for m in modes:
+        parts.append((m.get("failure_id", "") or "").lower())
+        parts.append((m.get("trigger_condition", "") or "").lower())
+    text = " ".join(parts)
+
+    has_input_side = any(k in text for k in (
+        "input", "missing", "invalid", "exceeds", "too long", "too_long",
+        "empty", "malformed", "out of range", "out_of_range", "wrong format",
+        "wrong_format", "unsupported", "unsupported_", "bad_", "_required",
+    ))
+    has_runtime_side = any(k in text for k in (
+        "connection", "api", "context", "memory", "unavailable", "permission",
+        "timeout", "rate limit", "rate_limit", "quota", "_unavailable",
+        "service_", "_failure", "context_budget", "context budget",
+    ))
+    has_output_side = any(k in text for k in (
+        "output", "fabricat", "no result", "no_result", "ambiguous", "ambig_",
+        "no action", "no_action", "not found", "not_found", "no_items",
+        "no_match", "no match", "no_owner", "_drift", "drift", "_mismatch",
+        "mismatch", "incomplete", "_found", "uniformly low", "low_confidence",
+        "no_findings", "no findings",
+    ))
 
     findings: list[str] = []
     if not has_input_side:
