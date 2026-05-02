@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/pjpoulose/skill-architect/tools/spec_schema.json",
+  "title": "Skill Architect — Canonical Spec Schema",
+  "description": "JSON Schema for validating LLM skill specs produced by Skill Architect. Specs may be authored as YAML or JSON; YAML files should be parsed to JSON before validation.",
+  "type": "object",
+  "required": [
+    "skill_id",
+    "version",
+    "display_name",
+    "summary",
+    "action_class",
+    "tier_recommendation",
+    "single_responsibility_assertion",
+    "input_schema",
+    "output_schema",
+    "context_requirements",
+    "connection_requirements",
+    "cost_class",
+    "failure_modes"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "skill_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*[a-z0-9]$",
+      "minLength": 3,
+      "maxLength": 60,
+      "description": "Lowercase, hyphenated, unique identifier. Must start with a letter and end with a letter or digit."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version, MAJOR.MINOR.PATCH"
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60,
+      "description": "Human-readable display name."
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 140,
+      "description": "One-sentence description of what the skill does."
+    },
+    "action_class": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6,
+      "description": "Single action class. 1=Read, 2=Generate, 3=Modify-internal, 4=External-known, 5=External-irreversible, 6=Privileged."
+    },
+    "tier_recommendation": {
+      "type": "string",
+      "enum": ["fast-path", "standard", "high-stakes"],
+      "description": "Recommended execution tier. Final tier is platform-determined."
+    },
+    "single_responsibility_assertion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "One sentence stating the single thing this skill does. Validator flags 'and' or 'then' as potential AP-01 (compound intent)."
+    },
+    "input_schema": {
+      "$ref": "#/$defs/strictJsonSchema"
+    },
+    "output_schema": {
+      "$ref": "#/$defs/strictJsonSchema"
+    },
+    "context_requirements": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "description": "Memory partitions or context categories the skill reads at runtime. Empty array means no context required."
+    },
+    "connection_requirements": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "native-protocol",
+          "api",
+          "plugin",
+          "webhook",
+          "browser-automation"
+        ]
+      },
+      "uniqueItems": true,
+      "description": "External connection methods this skill needs. Empty array means no external connection."
+    },
+    "cost_class": {
+      "type": "string",
+      "enum": ["free", "low", "medium", "high"],
+      "description": "Projected cost class per execution."
+    },
+    "failure_modes": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/failureMode"
+      },
+      "description": "At least three documented failure modes."
+    },
+    "recipient_scope_declaration": {
+      "type": "string",
+      "description": "Required when action_class >= 4. Whose contact list this skill writes to."
+    },
+    "reversibility_assertion": {
+      "type": "string",
+      "enum": ["irreversible"],
+      "description": "Required when action_class == 5. Must equal 'irreversible'."
+    },
+    "financial_envelope_declaration": {
+      "type": "object",
+      "required": ["max_amount", "velocity_limit", "recipient_scope"],
+      "additionalProperties": false,
+      "properties": {
+        "max_amount": {
+          "type": "number",
+          "minimum": 0
+        },
+        "velocity_limit": {
+          "type": "string",
+          "description": "Human-readable velocity cap, e.g. '5_per_24h'"
+        },
+        "recipient_scope": {
+          "type": "string"
+        }
+      },
+      "description": "Required when action_class == 6."
+    },
+    "no_sensitive_data_assertion": {
+      "type": "boolean",
+      "description": "Required when connection_requirements contains 'browser-automation'. Must be true."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "action_class": { "minimum": 4 } }
+      },
+      "then": {
+        "required": ["recipient_scope_declaration"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "action_class": { "const": 5 } }
+      },
+      "then": {
+        "required": ["reversibility_assertion"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "action_class": { "const": 6 } }
+      },
+      "then": {
+        "required": ["financial_envelope_declaration"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "connection_requirements": {
+            "type": "array",
+            "contains": { "const": "browser-automation" }
+          }
+        }
+      },
+      "then": {
+        "required": ["no_sensitive_data_assertion"],
+        "properties": {
+          "no_sensitive_data_assertion": { "const": true }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "strictJsonSchema": {
+      "type": "object",
+      "required": ["type", "additionalProperties"],
+      "properties": {
+        "type": { "const": "object" },
+        "required": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "properties": {
+          "type": "object"
+        },
+        "additionalProperties": {
+          "const": false,
+          "description": "Must be false. additionalProperties: true is rejected (schemas must be strict)."
+        }
+      },
+      "description": "Input/output schemas must be strict (additionalProperties: false)."
+    },
+    "failureMode": {
+      "type": "object",
+      "required": [
+        "failure_id",
+        "trigger_condition",
+        "platform_response",
+        "user_message"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "failure_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Lowercase, snake_case identifier."
+        },
+        "trigger_condition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform_response": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user_message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      }
+    }
+  }
+}

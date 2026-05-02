@@ -1,0 +1,49 @@
+name: Validate skill specs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'specs/**'
+      - 'tools/**'
+      - '.github/workflows/validate.yml'
+  pull_request:
+    paths:
+      - 'specs/**'
+      - 'tools/**'
+      - '.github/workflows/validate.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate specs against canonical schema
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r tools/requirements.txt
+
+      - name: Validate specs directory (if present)
+        run: |
+          if [ -d specs ]; then
+            python tools/validate.py specs/
+          else
+            echo "No specs/ directory found — skipping spec validation."
+            echo "Add your skill specs under specs/*.yaml to enable automated validation."
+          fi
+
+      - name: Validate schema is well-formed
+        run: |
+          python -c "import json; json.load(open('tools/spec_schema.json'))"
+          echo "spec_schema.json is valid JSON."
